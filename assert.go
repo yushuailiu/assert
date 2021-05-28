@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"runtime"
 	"testing"
+	"unsafe"
 )
 
 // assert val1 is equal to val2
@@ -31,7 +32,7 @@ func NotEqualSkip(t *testing.T, skip int, val1, val2 interface{}) {
 	if IsEqual(val1, val2) {
 		_, file, line, _ := runtime.Caller(skip)
 		fmt.Printf("%s:%d %v should not be equal %v\n", path.Base(file), line, val1, val2)
-		t.FailNow()
+		t.Fail()
 	}
 }
 
@@ -90,4 +91,74 @@ CASE3:
 	return reflect.DeepEqual(v1, v2.Interface())
 CASE4:
 	return reflect.DeepEqual(v1, v2)
+}
+
+
+func MapHasKey(t *testing.T, m map[interface{}]interface{}, i interface{}) {
+	ValueIsNullSkip(t, m, 2)
+
+	if !TypeIsComparableSkip(t, i, 2) {
+		return
+	}
+	_, ok := m[i]
+	if !ok {
+		_, file, line, _ := runtime.Caller(1)
+		fmt.Printf("%s:%d %v map has not key %v", path.Base(file), line, m, i)
+		t.Fail()
+	}
+}
+
+func TypeIsComparable(t *testing.T, i interface{})  {
+	TypeIsComparableSkip(t, i, 2)
+}
+
+func TypeIsComparableSkip(t *testing.T, i interface{}, skip int) bool {
+	if nil == i || reflect.TypeOf(i).Comparable() {
+		return true
+	}
+	_, file, line, _ := runtime.Caller(skip)
+	fmt.Printf("%s:%d %v is not comparable", path.Base(file), line, i)
+	t.Fail()
+	return false
+}
+
+func ValueIsNullSkip(t *testing.T, i interface{}, skip int)  {
+	isNull := false
+	if nil == i {
+		isNull = true
+	} else if !reflect.ValueOf(i).IsValid() {
+		isNull = true
+
+	} else {
+		switch reflect.TypeOf(i).Kind() {
+		case reflect.Ptr, reflect.Map, reflect.Array, reflect.Chan, reflect.Slice:
+			isNull = reflect.ValueOf(i).IsNil()
+		}
+	}
+	if isNull {
+		_, file, line, _ := runtime.Caller(skip)
+		fmt.Printf("%s:%d %v is not null", path.Base(file), line, i)
+		t.Fail()
+	}
+}
+
+type InterfaceStructure struct {
+	pt uintptr
+	pv uintptr
+}
+
+// transform interface{} to InterfaceStructure
+func AsInterfaceStructure(i interface{}) InterfaceStructure {
+	return *(*InterfaceStructure)(unsafe.Pointer(&i))
+}
+
+
+// get all keys of map
+func getMapKeys(m map[interface{}]interface{}) []interface{} {j := 0
+	keys := make([]interface{}, len(m))
+	for k := range m {
+		keys[j] = k
+		j++
+	}
+	return keys
 }
